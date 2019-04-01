@@ -1,0 +1,164 @@
+---
+title: "CKME136 XJ0 - Step 1: Collect and pre-process data"
+output: html_notebook
+---
+
+This is the first of four R Notebook files:
+
+* **CKME136 XJ0 - Step 1: Collect and pre-process data**  
+* CKME136 XJ0 - Step 2: Analyze data (non-textual)  
+* CKME136 XJ0 - Step 3: Analyze data (textual)  
+* CKME136 XJ0 - Step 4: Machine learning for sentiment analysis 
+
+
+##Pre-Processing
+
+####Load the required packages
+
+```{r load_packages}
+#Load packages
+library(rtweet) #Collecting tweets 
+library(tidyverse) #Wrangling data
+library(summarytools) #Summarizing data sets and selecting variables to include and exclude
+```
+
+
+
+####Set the working directory and a folder path variable
+```{r wdandpath}
+#Set working directory and path for saving CSV
+wd=setwd("B:\\canpoli_ryerson")
+path="B:\\canpoli_ryerson"
+
+```
+
+##Collect data
+####Collect and save Twitter account timelines [Tweeting] data
+Collect each party leader's Twitter activity from their 'personal' accounts. This data makes up the 'Tweeting' data.
+
+The [get_timelines] function collects all required tweets in one pull. There's no need for muliple pulls since the function collects up to 3200 tweets for each Twitter user, which is sufficient.
+
+```{r get_timelines}
+#Get individual timelines
+canpoli.tmls=rtweet::get_timelines(c(
+  "@MaximeBernier",
+  "@JustinTrudeau", 
+  "@AndrewScheer",
+  "@theJagmeetSingh",
+  "@ElizabethMay"),
+  n = 5000)
+
+#Save tweet timelines data (complete set) as CSV
+rtweet::save_as_csv(canpoli.tmls, file_name="canpoli.tmls.complete", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+
+```
+
+####Collect and save Twitter account search [Twitter Buzz] data
+Collect tweets containing any of the party leader's Twitter user account names. This data makes up the 'Twitter Buzz' data.
+
+The *search_tweets* function is limited to collecting tweets up to a maximum of 6-9 preceding days and in increments of 18,000. Therefor the retryratelimit has been set to true and the number (*n*) of tweets  to collect is set to one million to ensure collection of all tweets in the preceding 6-9 days.
+
+Searching tweets required multiple pulls. As an added step, a *since_id* was specified in order to limit the next pull do status IDs greater than the ID specified. 
+ 
+```{r search_tweets}
+#Search tweets for Twitter user account names
+canpoli.srch=search_tweets(
+  "@MaximeBernier OR
+  @AndrewScheer OR
+  @JustinTrudeau OR
+  @theJagmeetSingh OR
+  @ElizabethMay", n = 1000000, retryonratelimit = TRUE, parse=TRUE, since_id=1108042631068606464)
+
+#Previous max status:
+#1108042631068606464
+
+#For each additonal pull, get the max status_id to ensure only new data is collected in subsequent pulls
+staus_id_max=canpoli.srch.complete4 %>%                
+  summarise(staus_id_max= max(status_id)) 
+
+#Save tweet search data (complete set) as CSV
+save_as_csv(canpoli.srch, file_name="canpoli_03-26-2019", prepend_ids = TRUE, na = "",fileEncoding = "UTF-8")
+```
+##Filter data
+####Indentify required/useful variables 
+The rtweet functions return dataframes containing 88 variables. 
+
+The summarytools package was used to inspect/analyze data and identify useful/required variables. 
+
+Many of these variables are not required for the following reasons:  
+
+* Project purposes (e.g., [status_url])  
+* Contain majority of missing values (e.g., [place_name])  
+* Contain the 100% of the same value (e.g., [country])  
+
+By removing them, the size of the dataframe was reduced from 88 variables to 20 variables.
+
+```{r summary_tools}
+#Load complete get_timelines data set 
+canpoli.tmls.complete=read_csv("canpoli.tmls.complete.csv") 
+
+#Load complete search_tweets data sets 
+canpoli.srch.complete1=read_csv("canpoli_02-20-2019.csv") 
+canpoli.srch.complete2=read_csv("canpoli_03-04-2019.csv") 
+canpoli.srch.complete3=read_csv("canpoli_03-11-2019.csv") 
+canpoli.srch.complete4=read_csv("canpoli_03-18-2019.csv")
+canpoli.srch.complete5=read_csv("canpoli_03-26-2019.csv") 
+
+#Create and view a dataframe summary (both data sets contain the same variables)
+canpoli.tmls.summary=summarytools::dfSummary(canpoli.tmls.complete)
+#View the dataframe summary
+summarytools::view(canpoli.tmls.summary)
+
+#Using the dataframe summary for analysis, created a list of required variables
+req_var=c(1:6,11:15,30,71,76:82)
+
+```
+####Filter data to select required/useful variables only
+Select the required variables using the req_var list. 
+This results in a **77% reduction** in the number of variables and a similar reduction in file size.
+
+An additional step is required to perform a full join on each *search_tweets* data set, and save a new merged. Due to memory issues on the local machine, this was done using multiple steps.
+
+```{r}
+#Create filtered get_timelines data set 
+canpoli.tmls.filtered=canpoli.tmls.complete %>% select(req_var)
+
+#Create filtered search_tweets data sets
+#Process files one-by-one to save memory
+canpoli.srch.filtered1=canpoli.srch.complete1 %>% select(req_var)
+canpoli.srch.filtered2=canpoli.srch.complete2 %>% select(req_var)
+canpoli.srch.filtered3=canpoli.srch.complete3 %>% select(req_var)
+canpoli.srch.filtered4=canpoli.srch.complete4 %>% select(req_var)
+canpoli.srch.filtered5=canpoli.srch.complete5 %>% select(req_var)
+
+#Join search_tweets data (4 steps to save memory)
+canpoli.srch.complete_A=full_join(canpoli.srch.filtered1,canpoli.srch.filtered2)
+canpoli.srch.complete_B=full_join(canpoli.srch.filtered3,canpoli.srch.filtered4)
+canpoli.srch.complete_C=full_join(canpoli.srch.complete_A,canpoli.srch.complete_B)
+canpoli.srch.complete_ALL=full_join(canpoli.srch.complete_C,canpoli.srch.filtered5)
+
+```
+##Post-processing
+####Adjust time and synchronize date range
+
+* Adjust the created_at time for GMT-5 (Ottawa) time    
+* Filter the tweets_timelines data to only include tweets after 2019-02-18 (to match the search_tweets data)  
+* Filter both datasets to include English teets only  
+
+```{r}
+#Subtract 5 hours (18000 seconds) from the created_at varible to get Ottawa time (GMT-5)
+canpoli.tmls.filtered$created_at=canpoli.tmls.filtered$created_at-18000
+canpoli.srch.complete_ALL$created_at=canpoli.srch.complete_ALL$created_at-18000
+
+#Filter on greater than Jan 01, 2019, not including retweets, and English tweets only
+canpoli.tmls.filtered= canpoli.tmls.filtered %>% dplyr::filter(created_at > "2019-02-18", lang=="en")
+canpoli.srch.filtered= canpoli.srch.complete_ALL %>% dplyr::filter(lang=="en")
+```
+
+##Save final versions of filtered datasets
+
+```{r}
+#Save filtered timelines data set to .CSV
+write_csv(canpoli.tmls.filtered, path = "B:\\canpoli_ryerson\\canpoli.tmls.filtered.csv")
+write_csv(canpoli.srch.filtered, path = "B:\\canpoli_ryerson\\canpoli.srch.filtered.csv")
+```

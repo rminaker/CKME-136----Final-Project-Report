@@ -1,0 +1,146 @@
+---
+title: "Step 4: Collect and pre-process data"
+output: html_notebook
+---
+
+This is the fourth of four R Notebook files:
+
+* CKME136 XJ0 - Step 1: Collect and pre-process data  
+* CKME136 XJ0 - Step 2: Analyze data (non-text)   
+* CKME136 XJ0 - Step 3: Analyze data (text)  
+* CKME136 XJ0 - **Step 4: ML for sentiment analysis**  
+
+
+##Pre-Processing
+
+####Load the required packages
+
+```{r load_packages, echo=TRUE}
+#Load packages
+library(tidyverse) #Wrangling data
+library(tidytext) #Text processing
+library(tm) #Text mining 
+library(caret) #Machine learning
+library(randomForest) #Machine learning
+library(qdap)
+```
+
+
+####Set the working directory and a folder path variable
+```{r wdandpath}
+#Set working directory and path for saving CSV
+wd=setwd("B:\\canpoli_ryerson")
+path="B:\\canpoli_ryerson"
+
+```
+
+##Get sentiment and create DTM for training ML model
+
+```{r preprocess}
+#Load filtered get_timelines data set
+df=read_csv("canpoli.tmls.filtered.csv")
+df=df %>%filter(is_retweet=="FALSE")
+
+#Select text, ID and columns of possible value for ML
+df1=df[c(2,4,5,6,9,10,11)]
+
+#Access bing lexicon: bing
+bing=get_sentiments("bing")
+
+#Unnest tokens from df 
+ut=df1 %>%unnest_tokens(word, text)
+
+#Join unnested token df with Bing lexicon
+df2=ut %>%inner_join(bing)
+
+#Create a corpus from words, keeping status ID
+corpus=with(df2, as.Corpus(word, status_id))
+
+#Create a DTM
+#dtm=as.dtm(corpus)
+dtm=DocumentTermMatrix(corpus)
+dtm=removeSparseTerms(dtm, 0.99) 
+#Create a df from corpus
+m=as.matrix(dtm)
+
+data=key_merge(matrix2df(dtm, "status_id"), df2, "status_id")
+write_csv(data, path = "B:\\canpoli_ryerson\\data_sentiment_ml.csv")
+```
+
+
+##Prepare data and run ML
+
+```{r}
+data1=read_csv("data_sentiment_ml.csv") 
+data1=data1 %>% mutate_if(is.character,factor) %>% select(-hashtags)
+
+data1=as.data.frame(data1)
+#%>% mutate_if(is.integer,as.numeric)
+
+#Spliting training set into two parts based on outcome: 75% and 25%
+index1=createDataPartition(data1$sentiment, p=0.75, list=FALSE)
+trainSet1=data1[ index1,]
+testSet1=data1[-index1,]
+
+#Defining the training controls for multiple models
+fitControl1=trainControl(
+  method = "cv",
+  number = 5,
+  savePredictions = 'final',
+  classProbs = T)
+
+#Defining the predictors and outcome
+predictors1<-c(2:51,58)
+outcomeName1<-'sentiment'
+
+
+```
+
+###Random forest ML
+```{r}
+#Training the random forest model
+model_rf<-train(trainSet1[,predictors1],trainSet1[,outcomeName1],method='rf',trControl=fitControl1,tuneLength=3)
+
+#Predicting using random forest model
+testSet1$pred_rf<-predict(object = model_rf,testSet1[,predictors1])
+
+#Checking the accuracy of the random forest model
+confusionMatrix(testSet1$sentiment,testSet1$pred_rf)
+```
+
+###KNN ML
+```{r}
+#Training the knn model
+model_knn<-train(trainSet1[,predictors1],trainSet1[,outcomeName1],method='knn',trControl=fitControl1,tuneLength=3)
+
+#Predicting using knn model
+testSet1$pred_knn<-predict(object = model_knn,testSet1[,predictors1])
+
+#Checking the accuracy of the random forest model
+confusionMatrix(testSet1$sentiment,testSet1$pred_knn)
+```
+
+
+###Logistic regression
+```{r}
+#Training the Logistic regression model
+model_lr<-train(trainSet1[,predictors1],trainSet1[,outcomeName1],method='glm',trControl=fitControl1,tuneLength=3)
+
+#Predicting using knn model
+testSet1$pred_lr<-predict(object = model_lr,testSet1[,predictors1])
+
+#Checking the accuracy of the random forest model
+confusionMatrix(testSet1$sentiment,testSet1$pred_lr)
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+

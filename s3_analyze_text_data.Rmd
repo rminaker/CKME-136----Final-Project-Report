@@ -1,0 +1,220 @@
+---
+title: "CKME136 XJ0 - Step 3: Analyze data (text) "
+output: html_notebook
+---
+
+This is the third of four R Notebook files:
+
+* CKME136 XJ0 - Step 1: Collect and pre-process data  
+* CKME136 XJ0 - Step 2: Analyze data (non-text)   
+* **CKME136 XJ0 - Step 3: Analyze data (textual)**    
+* CKME136 XJ0 - Step 4: Machine learning for sentiment analysis 
+
+
+##Pre-Processing
+
+####Load the required packages
+
+```{r load_packages, echo=TRUE}
+#Load packages
+library(tidyverse) #Wrangling data
+library(tidytext) #Text processing
+library(qdap) #Text mining 
+library(tm) #Text mining 
+library(textstem) #Text stemming
+library(wordcloud) #Viewing wordclouds
+library(radarchart) #Visualization
+```
+
+
+####Set the working directory and a folder path variable
+```{r wdandpath}
+#Set working directory and path for saving CSV
+wd=setwd("B:\\canpoli_ryerson")
+path="B:\\canpoli_ryerson"
+
+```
+
+
+####Load filtered data sets
+```{r load_data}
+#Load filtered get_timelines data set
+canpoli.tmls.filtered=read_csv("canpoli.tmls.filtered.csv")
+canpoli.tmls.filtered=canpoli.tmls.filtered %>%filter(is_retweet=="FALSE")
+
+#Load filtered search_tweets data set 
+canpoli.srch.filtered=read_csv("canpoli.srch.filtered.csv") 
+canpoli.srch.filtered=canpoli.srch.filtered %>%filter(is_retweet=="FALSE")
+```
+
+
+##Pre-processing text
+
+####Remove unwanted elements using Regex
+
+```{r pre-process_text}
+#Rename both df as "df" so we can reuse the folling code regardless of previous filtering or dataset
+df=canpoli.tmls.filtered[1:10]
+df=canpoli.srch.filtered[1:10]
+
+#Remove URLs
+df$text=gsub(" ?(f|ht)(tp)(s?)(://)(.*)[.|/](.*)", "", df$text) 
+
+#Remove handles
+#@([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.)
+df$text=gsub("@([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.)", "", df$text, perl = TRUE)
+
+#Remove hashtags
+#@([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.)
+df$text=gsub("#([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.)", "", df$text, perl = TRUE) 
+
+#Remove EMOGIEs
+df$text=gsub("(<[^>]+>)", "", df$text, perl = TRUE) 
+
+```
+
+
+####Replace elements
+
+```{r text_process2}
+#Replace contractions
+#Ensure that apostrophe is the right encoding
+df$text=gsub("'", "'", df$text, perl = TRUE) 
+df$text=replace_contraction(df$text)
+
+#Replace symbols with their word equivalent
+df$text=replace_symbol(df$text)
+
+#Save the df as tweet_text and save a CSV of cleaned pre-corpus text
+tweet_text=df
+#Save filtered timelines data set to .CSV
+#write_csv(df, path = "B:\\canpoli_ryerson\\canpoli.tmls.cleaned.csv")
+write_csv(df, path = "B:\\canpoli_ryerson\\canpoli.srch.cleaned.csv")
+write_csv(df, path = "B:\\canpoli_ryerson\\canpoli.tmls.cleaned.csv")
+```
+
+####Corpus processing
+
+```{r corpus_processing}
+#df=read_csv("canpoli.srch.cleaned.csv") 
+#create a volatile corpus 
+tweets_corpus = VCorpus(VectorSource(tweet_text$text))
+
+#Clean the corpus using TM functions
+tweets_corpus=tm_map(tweets_corpus, content_transformer(tolower))
+tweets_corpus=tm_map(tweets_corpus, stripWhitespace)
+tweets_corpus=tm_map(tweets_corpus, removePunctuation)
+tweets_corpus=tm_map(tweets_corpus, removeNumbers)
+tweets_corpus=tm_map(tweets_corpus, removeWords, stopwords("en"))
+tweets_corpus=tm_map(tweets_corpus, content_transformer(lemmatize_strings))
+tweets_corpus=tm_map(tweets_corpus, removeWords, c("the","via","amp","will","for","let","can","like","elizabeth","may","justin","trudeau","maxime","bernier", "andrew", "scheer", "jagmeet","singh","canadian","get","make","trudeaus","good","thank","canada","take","come","canadas"))
+
+#writeCorpus(tweets_corpus, path = "B:\\canpoli_ryerson\\canpoli.srch.corpus.csv", filenames = NULL)
+
+```
+
+####DTM processing and word frequency analysis
+
+```{r tdm_wordcloud}
+#create a DTM
+dtm=DocumentTermMatrix(tweets_corpus, control = list(weighting = weightTf, 
+                         stopwords = FALSE))
+dtm=removeSparseTerms(dtm, 0.99) 
+
+#Create a matrix
+m=as.matrix(dtm)
+
+#Sum and sort word frequencies
+word_freqs = sort(colSums(m), decreasing = TRUE) 
+
+# create a data frame with words and their frequencies
+dm = data.frame(word = names(word_freqs), freq = word_freqs)
+
+#Create a wordcloud of frequent terms
+#Two word clouds - one for each dataset
+wordcloud(dm$word, dm$freq, 
+          random.order = FALSE, 
+          colors = brewer.pal(5, "Dark2"),
+          min.freq = 10,
+          #rot.per=0.35,
+          scale=c(3,.4),
+          max.words=100
+)
+```
+
+####Sentiment analysis
+
+```{r getNRCsentiment}
+#Load the clean text (text that was already pre-processed [pre-corpus])
+df=read_csv("canpoli.srch.cleaned.csv")
+df=read_csv("canpoli.tmls.cleaned.csv")
+
+#Tidytext sentiment analysis with NRC
+#Get the NRC sentiment dictionary
+nrc=get_sentiments("nrc")
+
+#Subset the text and name column to make processing easier
+df=df[4:5]
+
+
+#Unest tokens
+ut=df %>% unnest_tokens(word, text)
+
+#Join dataframes
+sa=ut %>% inner_join(nrc)
+
+
+#Sentiment with name (CPPL)
+sentiment_analysis=sa %>% 
+  group_by(screen_name,sentiment) %>% 
+  count(screen_name, sentiment) %>% 
+  select(screen_name, sentiment, sentiment_name_count = n)
+
+#Sentiment with name (CPPL)
+total_sentiment=sa %>% 
+  count(screen_name) %>% 
+  select(screen_name, name_total = n)
+
+#Radar sentiment
+sentiment_analysis %>% 
+  inner_join(total_sentiment, by = "screen_name") %>% 
+  mutate(percent=sentiment_name_count/name_total * 100) %>% 
+  select(-sentiment_name_count,-name_total) %>% 
+  spread(screen_name, percent) %>% 
+  chartJSRadar(showToolTipLabel = TRUE,main = "Tweet sentiment - CPPL tweets")
+
+
+#Faceted sentiment
+sentiment_analysis %>%
+  ggplot(., aes(x = sentiment, y=sentiment_name_count,fill=sentiment)) +
+  geom_bar(stat = "identity")+
+  theme(legend.title = element_blank())+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "CPPLs tweet sentiment",
+    subtitle = "Tweet counts aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )+ 
+  facet_wrap(~ screen_name)+
+  coord_flip()
+
+#Sentiment analysis (@ CPPLs)
+sentiment_analysis %>%
+  ggplot(., aes(x = sentiment, y=sentiment_count,fill=sentiment)) +
+  geom_bar(stat = "identity")+
+  theme(legend.title = element_blank())+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Sentiment directed at CPPLs",
+    subtitle = "Tweet counts aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )+ 
+  #facet_wrap(~ screen_name)+
+  coord_flip()
+
+```
+
+
+
+
+
