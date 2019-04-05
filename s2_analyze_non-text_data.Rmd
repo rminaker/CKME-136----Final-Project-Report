@@ -1,0 +1,577 @@
+---
+title: "CKME136 XJ0 - Step 2: Analyze data (non-textual) "
+output: html_notebook
+---
+
+This is the second of four R Notebook files:
+
+* CKME136 XJ0 - Step 1: Collect and pre-process data  
+* **CKME136 XJ0 - Step 2: Analyze data (non-textual)**    
+* CKME136 XJ0 - Step 3: Analyze data (textual)  
+* CKME136 XJ0 - Step 4: Step 4: Machine learning for sentiment analysis  
+
+
+##Pre-Processing
+
+####Load the required packages
+
+```{r load_packages}
+#Load packages
+library(rtweet) #Analyzing tweets 
+library(tidyverse) #Wrangling data
+library(tidytext) #Text processing
+library(PerformanceAnalytics)
+```
+
+####Load filtered data sets
+```{r load_data}
+#Load filtered get_timelines data set
+canpoli.tmls.filtered=read_csv("canpoli.tmls.filtered.csv") 
+
+#Load filtered search_tweets data set 
+canpoli.search.filtered=read_csv("canpoli.srch.filtered.csv") 
+```
+
+##Preliminary analysis 
+```{r pre_analysis}
+#View the summary of the dataframe
+summary(canpoli.tmls.filtered)
+#View the structure of the dataframe
+str(canpoli.tmls.filtered)
+```
+
+##Analysis of variables (timelines)
+
+####Tweets per CPPL (Canadian political party leader) and mentioned
+
+```{r number_tweets}
+
+#Overall CPPL tweets over duration of project
+canpoli.tmls.filtered %>%
+    ts_plot("days", trim = 1L) +
+  ggplot2::geom_line(size=1) +
+  ggplot2::theme_classic() +
+  scale_color_manual("blue")+
+  ggplot2::theme(
+    legend.title = ggplot2::element_blank(),
+    legend.position = "bottom",
+    plot.title = ggplot2::element_text(face = "bold")) +
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Tweets by CPPLs (original tweets & retweets)",
+    subtitle = "Twitter status (tweet) counts aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Overall tweets mentioning CPPL over duration of project
+options(scipen=10000)
+canpoli.search.filtered %>%
+  ts_plot("days", trim = 1L) +
+  ggplot2::geom_line(size=1) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(
+    legend.title = ggplot2::element_blank(),
+    legend.position = "bottom",
+    plot.title = ggplot2::element_text(face = "bold")) +
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Tweets mentioning CPPLs (original tweets & retweets)",
+    subtitle = "Twitter status (tweet) counts aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Number of tweets per party leader
+canpoli.tmls.filtered %>%
+  ggplot(., aes(x = name,fill =is_retweet)) +
+  geom_bar()+
+  theme()+
+    ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Total tweets by CPPLs (original tweets and retweets)",
+    subtitle = "Tweets aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Number of tweets per party leader
+canpoli.tmls.filtered %>%
+  filter(is_retweet==FALSE) %>% 
+  ggplot(., aes(x = name,fill =is_retweet)) +
+  geom_bar()+
+  theme()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Total tweets by CPPLs (original tweets)",
+    subtitle = "Tweets aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+
+
+
+
+```
+
+####Tweets timeseries analysis
+
+```{r timeseries}
+#Number of tweets by party leader (comparison over time-original tweets and retweets)
+canpoli.tmls.filtered %>%
+  dplyr::group_by(name) %>%
+  ts_plot("days", trim = 1L) +
+  ggplot2::geom_line() +
+  ggplot2::theme_classic() +
+  ggplot2::theme(
+    legend.title = ggplot2::element_blank(),
+    legend.position = "bottom",
+    plot.title = ggplot2::element_text(face = "bold")) +
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Tweets by CPPLs (original tweets & retweets)",
+    subtitle = "Twitter status (tweet) counts aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Number of tweets by party leader (comparison over time original tweets only)
+canpoli.tmls.filtered %>%
+  dplyr::group_by(name) %>%
+  dplyr::filter(is_retweet ==FALSE) %>% 
+  ts_plot("days", trim = 1L) +
+  ggplot2::geom_line() +
+  ggplot2::theme_classic() +
+  ggplot2::theme(
+    legend.title = ggplot2::element_blank(),
+    legend.position = "bottom",
+    plot.title = ggplot2::element_text(face = "bold")) +
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Tweets by CPPLs (original tweets only)",
+    subtitle = "Twitter status (tweet) counts aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Number of tweets by party leader (comparison over time - retweets only)
+canpoli.tmls.filtered %>%
+  dplyr::group_by(name) %>%
+  dplyr::filter(is_retweet ==TRUE) %>% 
+  ts_plot("days", trim = 1L) +
+  ggplot2::geom_line() +
+  ggplot2::theme_classic() +
+  ggplot2::theme(
+    legend.title = ggplot2::element_blank(),
+    legend.position = "bottom",
+    plot.title = ggplot2::element_text(face = "bold")) +
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Tweets by CPPLs (retweets only)",
+    subtitle = "Twitter status (tweet) counts aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+```
+
+####Tweets source analysis
+
+```{r source}
+#Source of tweets by party leader
+canpoli.tmls.filtered %>%
+  ggplot(., aes(x = name, fill =source)) +
+  geom_bar()+
+  theme(legend.title = element_blank())+
+    ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Sources of tweets by CPPLs  (original tweets & retweets)",
+    subtitle = "Tweet counts aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )+
+  coord_flip()
+
+##Source of tweets by party leader (with retweets)
+canpoli.tmls.filtered %>%
+  ggplot(., aes(x = name, fill =source)) +
+  geom_bar()+
+  ggtitle("piped ggplot2")+
+  theme(legend.title = element_blank())+
+    ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Sources of tweets by CPPLs (original tweets vs. retweets)",
+    subtitle = "Tweet) counts aggregated from February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )+ facet_wrap(~ is_retweet)+
+  coord_flip()
+
+```
+
+####CPPLs followers analysis
+
+```{r followers}
+#Number of followers by CCPL (comparison)
+options(scipen=10000)
+canpoli.tmls.filtered %>%
+  group_by(name) %>%
+  summarize(avgfollowers = median(followers_count)) %>% 
+  arrange(desc(avgfollowers)) %>% 
+  ggplot(., aes(x = name, y=avgfollowers, fill=avgfollowers)) + 
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Number of followers of CPPLs",
+    subtitle = "Twitter follower counts: February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )+
+  coord_flip()
+
+#All leaders excluding Justin Trudeau since Trudeau seems to be an outlier
+canpoli.tmls.filtered %>%
+  filter(name != "Justin Trudeau") %>% 
+  group_by(name) %>%
+  summarize(avgfollowers = median(followers_count)) %>% 
+  arrange(desc(avgfollowers)) %>% 
+  ggplot(., aes(x = name, y=avgfollowers, fill =avgfollowers)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Number of followers of CPPLs (excl. Trudeau)",
+    subtitle = "Twitter follower counts: February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )+
+  coord_flip()
+```
+
+
+####Tweets favourited analysis
+
+```{r favourites}
+#Number of tweets favourited by party leader (comparison)
+#Count of tweets favourited
+ggplot(canpoli.tmls.filtered, aes(x = name, y=favorite_count, fill=favorite_count)) +
+  geom_bar(stat='identity') +
+  theme(legend.title = element_blank())+
+  #theme_classic()+
+  #facet_wrap(~ source)+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Number of CPPLs tweets favourited",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )+
+  coord_flip()
+
+#Average of tweets favourited
+canpoli.tmls.filtered %>% group_by(name) %>%     
+  summarise(Number_of_Tweets = n_distinct(status_id), Number_of_Likes = sum(favorite_count)) %>% 
+  mutate(Avg_Likes=Number_of_Likes/Number_of_Tweets)%>%
+  ggplot(., aes(x = name, y=Avg_Likes, fill =Avg_Likes)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Average number favourites per CPPL tweet",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )+
+  coord_flip()
+```
+
+####Tweet hashtag analysis (CPPL)
+
+```{r cppl_hashtag}
+#Hashtags by party leader (comparison)
+#Create a seperate chart for each party leader to examine main themes
+
+#Hastags by all CPPL (top 10)
+canpoli.tmls.filtered %>%
+  select(name, hashtags, is_retweet) %>% 
+  filter(is_retweet ==FALSE) %>% 
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(name,word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Top 10 hashtags used by all CPPL",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+  
+
+#Hastags by Trudeau (top 10)
+canpoli.tmls.filtered %>%
+  filter(name == "Justin Trudeau") %>% 
+  select(name, hashtags, is_retweet) %>% 
+  filter(is_retweet ==FALSE) %>% 
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(name,word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Hashtags used by Trudeau",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Hastags by Singh (top 10)
+canpoli.tmls.filtered %>%
+   filter(name == "Jagmeet Singh") %>% 
+   select(name, hashtags, is_retweet) %>% 
+  filter(is_retweet ==FALSE) %>%  
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(name,word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Hashtags used by Singh",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Hastags by Bernier (top 10)
+canpoli.tmls.filtered %>%
+  filter(name == "Maxime Bernier") %>% 
+  select(name,hashtags, is_retweet) %>% 
+  filter(is_retweet ==FALSE) %>%  
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(name,word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Hashtags used by Bernier",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Hastags by May (top 10)
+canpoli.tmls.filtered %>%
+  filter(name == "Elizabeth May") %>% 
+  select(name, hashtags, is_retweet) %>% 
+  filter(is_retweet ==FALSE) %>%  
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(name,word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Hashtags used by May",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Hastags by Scheer (top 10)
+canpoli.tmls.filtered %>%
+  filter(name == "Andrew Scheer") %>% 
+  select(name, hashtags, is_retweet) %>% 
+  filter(is_retweet ==FALSE) %>% 
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(name,word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Hashtags used by Scheer",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+```
+
+##Analysis of variables (search)
+####Tweet hashtag analysis (Public)
+
+```{r hashtag_buzz}
+#Top 10 hastags directed at all party leaders
+canpoli.search.complete %>%
+  select(hashtags) %>% 
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Top 10 hashtags directed at CPPLs",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Top 10 hastags in tweets mentioning Trudeau
+canpoli.search.complete %>%
+   filter(grepl("@JustinTrudeau",text)) %>% 
+  #filter(name == "Justin Trudeau") %>% 
+  select(hashtags) %>% 
+  #filter(is_retweet ==FALSE) %>% 
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Top 10 hastags in tweets mentioning Trudeau",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Top 10 hastags in tweets mentioning Bernier
+canpoli.search.complete %>%
+   filter(grepl("@MaximeBernier",text)) %>% 
+  #filter(name == "Justin Trudeau") %>% 
+  select(hashtags) %>% 
+  #filter(is_retweet ==FALSE) %>% 
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Top 10 hastags in tweets mentioning Bernier",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+  
+#Top 10 hastags in tweets mentioning Scheer
+canpoli.search.complete %>%
+   filter(grepl("@AndrewScheer",text)) %>% 
+  #filter(name == "Justin Trudeau") %>% 
+  select(hashtags) %>% 
+  #filter(is_retweet ==FALSE) %>% 
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Top 10 hastags in tweets mentioning Scheer",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+  
+#Top 10 hastags in tweets mentioning Singh
+canpoli.search.complete %>%
+  filter(grepl("@theJagmeetSingh",text)) %>% 
+  select(hashtags) %>% 
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Top 10 hastags in tweets mentioning Singh",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+
+#Top 10 hastags in tweets mentioning May
+canpoli.search.complete %>%
+  filter(grepl("@ElizabethMay",text)) %>% 
+  select(hashtags) %>% 
+  mutate(tolower(hashtags)) %>% 
+  unnest_tokens(word, hashtags) %>%
+  count(word, sort = TRUE) %>%
+  filter(!is.na(word), n>1) %>%
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ggplot(., aes(x = reorder(word, -n),y=n, fill=n)) +
+  geom_bar(stat='identity')+
+  theme(legend.title = element_blank())+
+  coord_flip()+
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Top 10 hastags in tweets mentioning May",
+    subtitle = "Tweet counts:  February 18 - March 29, 2019",
+    caption = "\nSource: Twitter REST API via rtweet"
+  )
+```
+
+##Correlations
+
+```{r corr}
+corr=tibble("party"=c("con","lib","ndp","grn","ppc"),"poll_pos" =1:5, "tweets_ot"=c(1,4,5,2,3), "tweets_all"=c(2,4,5,1,3), "followers"=c(3,1,4,2,5), "favourites"=c(2,1,4,5,3), "favourites_avg"=c(2,1,3,4,5))
+chart.Correlation(corr[2:6], histogram = TRUE, method = "pearson")
+
+```
+
+
+
+
+
+
